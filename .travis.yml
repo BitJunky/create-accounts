@@ -1,0 +1,50 @@
+dist: bionic
+language: rust
+rust:
+  - stable
+env:
+  global:
+    - NODE_VERSION="v14.7.0"
+    - SOLANA_VERSION="v1.6.6"
+    - ANCHOR_VERSION="v0.4.5"
+
+before_deploy:
+  - anchor build --verifiable
+  - echo "### SHA256 Checksums" > release_notes.md
+  - sha256sum target/deploy/create_accounts.so > binary.txt
+  - sha256sum target/idl/create_accounts.json > idl.txt
+  - cat *.txt >> release_notes.md
+  - echo "" >> release_notes.md
+  - echo "Built with Anchor [${ANCHOR_VERSION}](https://github.com/project-serum/anchor/releases/tag/${ANCHOR_VERSION})." >> release_notes.md
+
+deploy:
+  provider: releases
+  edge: true
+  file:
+    - "target/deploy/create_accounts.so"
+    - "target/idl/create_accounts.json"
+  release_notes_file: release_notes.md
+  skip_cleanup: true
+  on:
+    tags: true
+  api_key:
+    secure: "pZsugAdTL3uV2CK/xXR5SxRHt6wGOL/FVg25corQECBj7RX2CKkb4yxQQHZC8mS0b0VRswRYv8qYLbasHwjNKM3AdSpgapdwYZyLhkHmBITqD8Q9+NrkeME6ye58op+8jy09kq1ay8PJ344jAF7PLaG3TJsOuWhz+f+yOAQ0txeuio066mkuP96uG4BUtrgSNBfe2PYPdgJ1E7g+SHX105ZnQlMQJmw0grcy5mwa9Jz7gFEdN0NqRa4zBmHzrJ9Q2sw8aDjfnVWWW3/9vOBSifrQfbh44hrsGle8MSx7sCN4alP/25quW8urqlmhzfmyFV35tJicZZXL/T1udmrSmp6FKWMyMzC7ZjdO3mTC/+Uqz/17sbqlT83HGXDsJCwwXn3rqo3nQKnJ5egoamyRJ0voa3/0KFfUkYOKX1j6LVksdtNElYeNcULFId7mVaBB3LliDmZFRq3IIKHyTwPjAXsHBSkQOK22F0EStaIRVh+gyiS0c949Gh9wapwML/CKx6aO1wkJJw1estDCpx16NtfCjVenKLQucll4Xtlc62GV4N5/8Y6oKvXcge2vFw1aNc8uiE5PHzFfBEroW7sDeMbjfBxmADv4NYWBTrSvazCK0la4xNpzhDIg48EHIXoVLIs4vtGtaxSq1AlwqiyBaOLWjz0AXf10mJyDUGGzN8k="
+
+_defaults: &defaults
+  before_install:
+  - nvm install $NODE_VERSION
+  - npm install -g mocha
+  - npm install -g @project-serum/anchor
+  - sudo apt-get install -y pkg-config build-essential libudev-dev
+  - sh -c "$(curl -sSfL https://release.solana.com/${SOLANA_VERSION}/install)"
+  - export PATH="/home/travis/.local/share/solana/install/active_release/bin:$PATH"
+  - export NODE_PATH="/home/travis/.nvm/versions/node/${NODE_VERSION}/lib/node_modules/:${NODE_PATH}"
+  - yes | solana-keygen new
+  - cargo install --git https://github.com/project-serum/anchor --tag ${ANCHOR_VERSION} anchor-cli --locked
+
+jobs:
+  include:
+    - <<: *defaults
+      name: Runs the tests
+      script:
+        - anchor test
